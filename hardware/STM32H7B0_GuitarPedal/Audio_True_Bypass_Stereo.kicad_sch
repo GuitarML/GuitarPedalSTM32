@@ -1,0 +1,12 @@
+(kicad_sch
+	(version 20250114)
+	(generator "eeschema")
+	(generator_version "9.0")
+	(uuid "4e8b33b2-8291-492c-aac3-a5a6d542005f")
+	(paper "USLetter")
+	(title_block
+		(title "Daisy Seed Guitar Pedal 125B Custom Midi In/Out, No Relay BP")
+		(date "2025-08-02")
+	)
+	(lib_symbols)
+)
