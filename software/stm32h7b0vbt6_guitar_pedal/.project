@@ -34,12 +34,12 @@
 		<link>
 			<name>Source</name>
 			<type>2</type>
-			<location>C:/Users/rache/Desktop/Future Pedals/stm32GuitarPedal/software/deps/DaisySP/Source</location>
+			<location>C:/Users/rache/Desktop/Future Pedals/GuitarPedalSTM32/software/deps/DaisySP/Source</location>
 		</link>
 		<link>
 			<name>util</name>
 			<type>2</type>
-			<location>C:/Users/rache/Desktop/Future Pedals/stm32GuitarPedal/software/util</location>
+			<location>C:/Users/rache/Desktop/Future Pedals/GuitarPedalSTM32/software/util</location>
 		</link>
 	</linkedResources>
 </projectDescription>
