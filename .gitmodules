@@ -1,0 +1,3 @@
+[submodule "software/deps/DaisySP"]
+	path = software/deps/DaisySP
+	url = https://github.com/daisyaudio/DaisySP.git

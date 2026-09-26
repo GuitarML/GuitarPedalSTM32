@@ -4,6 +4,8 @@ This is a custom STM32 digital guitar pedal with firmware programmed in c++ usin
 running at 280MHz with 1.4MB SRAM and 128kb of flash. The PCB is designed using KiCad, and the JLCpcb Gerbers are included for easy ordering. This
 pedal is capable of reverbs, delays, granular, filtering, amp and cabsims, and anything else you can think up.
 
+![app](https://github.com/GuitarML/GuitarPedalSTM32/blob/main/images/pedal_pic.jpg)
+
 Hardware Features:
  - Mono input/output audio
  - Expression input
@@ -51,9 +53,16 @@ Tayda Drill Templates:
 NOTE: If you want to use the Single Footswitch/RGB LED version, you will need to change the peripheral settings. One of the footswitches changes from a GPIO input to a GPIO output (use pcb layout and schematic for guidance). Alternatively, you can change the LED pins from on/off GPIO outputs to Timer based PWM for brightness control. 
 
 
+![app](https://github.com/GuitarML/GuitarPedalSTM32/blob/main/images/pcb_pic.jpg)
+
+
 ## Software
 
 The effect in the main branch is an example delay/reverb using [DaisySP](https://github.com/electro-smith/daisysp). Other effects may be added as separate branches in this repo. I've found this to be the cleanest way to keep different configurations separate, rather than trying to comment out certain parts or use ifdef's. By default, the right footswitch is bypass, and the left footswitch is an aux function activated by holding the footswitch. This of course can be changed to whatever you want to do.
+
+Connecting the pedal with ST-Link v3:
+![app](https://github.com/GuitarML/GuitarPedalSTM32/blob/main/images/stlink_pic.jpg)
+
 
 ### Importing the Project
 
@@ -89,8 +98,8 @@ This project has been set up as a c++ project, however, STM32CubeIDE still auto 
 ## PCB Design Choices and Trade Offs
 
 This particular pedal is intended as a platform for myself and others to design and test new guitar effect algorithms. As someone
-coming from using the (Daisy Seed)[https://daisy.audio/], I wanted to dive deeper into understanding how microcontrollers work,
-and how to design custom boards using STM32. I also wanted to do something different from my Daisy Seed based (SoundSketch)[https://github.com/GuitarML/SoundSketch],
+coming from using the [Daisy Seed](https://daisy.audio/), I wanted to dive deeper into understanding how microcontrollers work,
+and how to design custom boards using STM32. I also wanted to do something different from my Daisy Seed based [SoundSketch](https://github.com/GuitarML/SoundSketch),
 rather than just try and recreate that same pedal without the Daisy Seed. The result is a more limited version of that pedal, using Mono processing,
 expression, no Midi, and a slower MCU. It does have more internal SRAM (1.4MB vs 1MB), with a 1MB contiguous block (vs Daisy Seed / H750 512KB contiguous block), that 
 can be used for things like data arrays and audio buffers.
