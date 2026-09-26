@@ -24,6 +24,11 @@
 #include "CS4270-Codec.h"
 #include "../../../deps/DaisySP/Source/daisysp.h"
 #include "../../../util/reverbsc_int16.h"
+#include "../../../util/Delays/delayline_reverse.h"
+#include "../../../util/Delays/delayline_revoct.h"
+
+
+
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -127,40 +132,6 @@ using namespace daisysp;
 ReverbSc16 verb;
 
 
-// Delay
-#define MAX_DELAY static_cast<size_t>(48000 * 2.f) // 2 second max delay
-DelayLine<float, MAX_DELAY> delayLine;
-
-struct delay
-{
-    DelayLine<float, MAX_DELAY> *del;
-    float                        currentDelay;
-    float                        delayTarget;
-    float                        feedback;
-    float                        active = false;
-
-    float Process(float in)
-    {
-        //set delay times
-        fonepole(currentDelay, delayTarget, .0002f);
-        del->SetDelay(currentDelay);
-
-        float read = del->Read();
-        if (active) {
-            del->Write((feedback * read) + in);
-        } else {
-            del->Write((feedback * read)); // if not active, don't write any new sound to buffer
-        }
-
-        return read;
-    }
-};
-
-delay             delay1;
-
-
-// NOTE: float / int16 conversions currently unused, but useful for saving RAM space if needed
-/*
 float signedINT16_to_float(int16_t s)
 {
     return s * INT16_TO_FLOAT;
@@ -174,7 +145,89 @@ int16_t float_to_signedINT16(float sample)
     // Scale to 16-bit integer range
     return (int16_t)(clamped * FLOAT_TO_INT16);
 }
-*/
+
+// Delay
+constexpr size_t MAX_DELAY_NORM = static_cast<size_t>(48000.0f * 1.f);
+constexpr size_t MAX_DELAY_REV = static_cast<size_t>(48000.0f * 2.f); // 2 second max delay (needs to be double for reverse, since read/write pointers are going
+                                                                             // opposite directions in the buffer)
+
+DelayLineRevOct<int16_t, MAX_DELAY_NORM> delayLine;
+DelayLineReverse<int16_t, MAX_DELAY_REV> delayLineRev;
+
+
+// This is the core delay struct, which actually includes two delays,
+// one for forwared/octave, and one for reverse. This is required
+// because the reverse delayline needs to be double the size of the
+// normal delayline to have the same range of the Time control. Both
+// delays are processed, with the main delay feeding into the reverse
+// delay to allow for Reverse Octave. A lowpass filter is included in
+// the feedback loop, which can tame the harsh high frequencies of the
+// octave delay, or create a "fading into the distance" effect for the
+// forward and reverse delays. A "level" param is included for modulation
+// of the output volume, for stereo panning.
+struct delayRevOct {
+    DelayLineRevOct<int16_t, MAX_DELAY_NORM> *del;
+    DelayLineReverse<int16_t, MAX_DELAY_REV> *delreverse;
+    float currentDelay;
+    float delayTarget;
+    float feedback = 0.0;
+    float active = false;
+    bool reverseMode = false;
+    //Tone toneOctLP;            // Low Pass
+    float level = 1.0;         // Level multiplier of output, added for stereo modulation
+    float level_reverse = 1.0; // Level multiplier of output, added for stereo modulation
+    bool dual_delay = false;
+    bool secondTapOn = false;
+
+    float Process(float in) {
+        // set delay times
+        fonepole(currentDelay, delayTarget, .0002f);
+        del->SetDelay(currentDelay);
+        delreverse->SetDelay1(currentDelay * 2);  // TODO IS it right to multiply by 2x?
+
+        float del_read = signedINT16_to_float(del->Read());
+
+        float read_reverse = signedINT16_to_float(delreverse->ReadRev()); // REVERSE
+
+        float read = 0.0;
+        if (reverseMode) {
+            //read = toneOctLP.Process(read_reverse);
+            read = read_reverse;
+        } else {
+            //read = toneOctLP.Process(del_read);
+            read = del_read;
+        }
+
+        float secondTap = 0.0;
+        if (secondTapOn) {
+            secondTap = signedINT16_to_float(del->ReadSecondTap());
+        }
+        // float read2 = delreverse->ReadFwd();
+        if (active) {
+            del->Write(float_to_signedINT16((feedback * read) + in));
+            delreverse->Write(float_to_signedINT16((feedback * read) + in)); // Writing the read from fwd/oct delay line allows for combining oct and rev for reverse octave!
+            // delreverse->Write((feedback * read2) + in);
+        } else {
+            del->Write(float_to_signedINT16(feedback * read)); // if not active, don't write any new sound to buffer
+            delreverse->Write(float_to_signedINT16(feedback * read));
+            // delreverse->Write((feedback * read2));
+        }
+
+        // TODO Figure out how to do dotted eighth with reverse
+
+        if (dual_delay) {
+            return read_reverse * level_reverse * 0.5 + (read + secondTap) * level * 0.5; // Half the volume to keep total level consistent
+        } else if (reverseMode) {
+            return read_reverse * level_reverse;
+        } else {
+            return (read + secondTap) * level;
+        }
+    }
+};
+
+delayRevOct delay1;
+
+
 
 
 /* USER CODE END PV */
@@ -420,11 +473,17 @@ int main(void)
   controlSetting[5] = 0.5f;
   controlSetting[6] = 0.5f;
 
+
   delayLine.Init();
+  delayLineRev.Init();
   delay1.del = &delayLine;
-  delay1.delayTarget = 2400; // in samples
+  delay1.delreverse = &delayLineRev;
+  delay1.delayTarget = 24000; // in samples
   delay1.feedback = 0.0;
   delay1.active = true;
+  //delay1.toneOctLP.Init(SAMPLING_FREQUENCY_HZ);
+  //delay1.toneOctLP.SetFreq(20000.0);
+
 
   // Effects
   verb.Init(SAMPLING_FREQUENCY_HZ);
@@ -677,10 +736,19 @@ int main(void)
 
     if (right_toggle_up == 0) {
     	rightTogglePosition = 0;
+        delay1.reverseMode = false;
+        delay1.del->setOctave(false);
+
     } else if (right_toggle_down == 0) {
     	rightTogglePosition = 2;
+        delay1.reverseMode = true;
+        delay1.del->setOctave(false);
+
     } else {
     	rightTogglePosition = 1;
+        delay1.reverseMode = false;
+        delay1.del->setOctave(true);
+
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
