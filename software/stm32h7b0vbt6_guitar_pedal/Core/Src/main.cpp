@@ -159,7 +159,7 @@ struct delay
 delay             delay1;
 
 
-
+// NOTE: float / int16 conversions currently unused, but useful for saving RAM space if needed
 /*
 float signedINT16_to_float(int16_t s)
 {
@@ -249,20 +249,46 @@ void Process_HalfBuffer() {
         ///////////////////////////////////////////////////////////////////////// 
 
         float dryLevelAdjust = 1.2; // Level adjustment for dry signal to match true bypass level
-        // (Note the perceptive levels seem different on amp vs through audio interface) - why?
 
-    	  float sendl, sendr, wetl, wetr;  // Reverb Inputs/Outputs
+    	float sendl, sendr, wetl, wetr;  // Reverb Inputs/Outputs
+        float reverb_out = 0.0;
+        float delay_out = 0.0;
 
-    	  sendl = sendr = leftIn;
-    	  verb.Process(sendl, sendr, &wetl, &wetr);
-    	  float reverb_out = (wetl + wetr) / 2;
+        if (leftTogglePosition == 1) { // Parallel Delay/Reverb
+    	    sendl = sendr = leftIn;
+    	    verb.Process(sendl, sendr, &wetl, &wetr);
+    	    reverb_out = (wetl + wetr) / 2;
+
+            // Process Delay
+            delay_out = delay1.Process(leftIn);
+
+        } else if (leftTogglePosition == 0) { //  Delay into Reverb
+            // Process Delay
+            delay_out = delay1.Process(leftIn) * delayMix;
+
+    	    sendl = sendr = delay_out + leftIn;
+    	    verb.Process(sendl, sendr, &wetl, &wetr);
+    	    reverb_out = (wetl + wetr) / 2;
+
+        } else if (leftTogglePosition == 2) { //  Reverb into Delay
+    	    sendl = sendr = leftIn;
+    	    verb.Process(sendl, sendr, &wetl, &wetr);
+    	    reverb_out = (wetl + wetr) / 2;
+
+            // Process Delay
+            delay_out = delay1.Process(reverb_out * reverbMix + leftIn); // TODO should leftIn be included here? see what sounds better
+        }
 
 
-        // Process Delay
-        float delay_out = delay1.Process(leftIn);
 
         //leftOut = leftIn * (1.0 - Mix) + wetl * Mix;
-        leftOut = leftIn * dryLevelAdjust + reverbMix * reverb_out + delayMix * delay_out;
+        if (leftTogglePosition == 1) { // Parallel Delay/Reverb
+            leftOut = leftIn * dryLevelAdjust + reverbMix * reverb_out + delayMix * delay_out;
+        } else if (leftTogglePosition == 0) { //  Delay into Reverb
+            leftOut = leftIn * dryLevelAdjust + reverbMix * reverb_out;
+        } else if (leftTogglePosition == 2) { //  Reverb into Delay
+            leftOut = leftIn * dryLevelAdjust + delayMix * delay_out;
+        }
 
         /////////////////////////////////////////////////////////////////////////
         // END DSP ////////////////////////////////////////////////////////////
@@ -421,10 +447,6 @@ int main(void)
   // Set bypass as default when powering on
   HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0, GPIO_PIN_RESET);
 
-
-  //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_11, GPIO_PIN_SET); // Turn on right led
-  //HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET); // Turn on  left led
-
   /*
    * Initialise codec
    */
@@ -444,7 +466,6 @@ int main(void)
   //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_3);
   //HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_4);
-
 
 
   /* USER CODE END 2 */
@@ -521,7 +542,7 @@ int main(void)
 
 					}
 
-					case 6: {
+					case 6: {  // EXPRESSION INPUT
 
 
 						break;
@@ -585,44 +606,33 @@ int main(void)
 
 	}
 
-  // If bypass muting was triggered and timer has finished, unmute audio and reset timer
-  if (quiet_bypass_wait_timer == quiet_bypass_threshold && quiet_bypass_reset == 1) {
-    HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
-    quiet_bypass_reset = 0;
-  }
+    // If bypass muting was triggered and timer has finished, unmute audio and reset timer
+    if (quiet_bypass_wait_timer == quiet_bypass_threshold && quiet_bypass_reset == 1) {
+      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET);
+      quiet_bypass_reset = 0;
+    }
 
 
 
 	// Aux Footswitch Action (Hold to engage, let go to disengage) //////////////////////////////////////
 	    uint32_t aux_footswitch = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_8);
-    /*
-	if (aux_footswitch == GPIO_PIN_RESET) {
-        aux = true;
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET); // Turn on left led
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET); // Mute audio (testing mute)
 
-	} else if (aux_footswitch == GPIO_PIN_SET) {
-        aux = false;
-        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET); // Turn off left led
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET); // Unmute audio (testing mute)
-	}
-    */
 	  // GPIO_PIN_SET means NOT pressed (1) (Opposite of what I usually think)
 	  // GPIO_PIN_RESET means pressed (0) (because the pin reads low, pressing footswitch connects pin to GND)
 
         // Initial check for when aux footswitch is pressed
 	  if (aux_footswitch == GPIO_PIN_RESET && aux_wait_timer == aux_threshold && aux == false && aux_reset == 0) {
 	    aux_wait_timer = 0; // Start aux wait timer for debouce
-      aux_reset = 1;
+        aux_reset = 1;
 	  }
 
         // Once debounce is complete and aux footswitch is still pressed, turn on Aux
 	  if (aux_footswitch == GPIO_PIN_RESET && aux_wait_timer == aux_threshold && aux == false && aux_reset == 1) { // If the footswitch is held, turn on led, do any other aux action
-      aux = true;
-      aux_reset = 0;
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET); // Turn on left led
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET); // Mute audio (testing mute)
-    }
+        aux = true;
+        aux_reset = 0;
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET); // Turn on left led
+        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET); // Mute audio (testing mute)
+      }
 
         // Initial check for once aux is let go
   	if (aux_footswitch == GPIO_PIN_SET && aux_wait_timer == aux_threshold && aux == true && aux_reset == 0) {
@@ -657,24 +667,20 @@ int main(void)
 
 
     if (left_toggle_up == 0) {  // 0 means pressed, or toggle position is up
-    	//HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0, GPIO_PIN_RESET);
-
+    	leftTogglePosition = 0;
     } else if (left_toggle_down == 0) { // 0 means pressed, or toggle position is down
-    	//HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0, GPIO_PIN_SET);
-
+    	leftTogglePosition = 2;
     } else {
-
+    	leftTogglePosition = 1;
     }
 
 
     if (right_toggle_up == 0) {
-    	//HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0, GPIO_PIN_RESET);
-
+    	rightTogglePosition = 0;
     } else if (right_toggle_down == 0) {
-    	//HAL_GPIO_WritePin(GPIOD, GPIO_PIN_0, GPIO_PIN_SET);
-
+    	rightTogglePosition = 2;
     } else {
-
+    	rightTogglePosition = 1;
     }
 
     //////////////////////////////////////////////////////////////////////////////////////////////////
