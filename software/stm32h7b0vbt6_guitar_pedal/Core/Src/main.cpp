@@ -179,11 +179,12 @@ struct delayRevOct {
     float feedback = 0.0;
     float active = false;
     bool reverseMode = false;
-    //Tone toneOctLP;            // Low Pass Filter removed for now
+    Svf toneOctLP;            // Low Pass Filter removed for now
     float level = 1.0;         // Level multiplier of output, added for stereo modulation (unused here)
     float level_reverse = 1.0; // Level multiplier of output, added for stereo modulation
     bool dual_delay = false;
     bool secondTapOn = false;
+    bool octMode = false;
 
     float Process(float in) {
         // set delay times
@@ -199,8 +200,10 @@ struct delayRevOct {
         if (reverseMode) {
             //read = toneOctLP.Process(read_reverse);
             read = read_reverse;
+        } else if (octMode) {
+            toneOctLP.Process(del_read);
+            read = toneOctLP.Low();
         } else {
-            //read = toneOctLP.Process(del_read);
             read = del_read;
         }
 
@@ -305,49 +308,51 @@ void Process_HalfBuffer() {
         // BEGIN DSP ////////////////////////////////////////////////////////////
         ///////////////////////////////////////////////////////////////////////// 
 
-        float dryLevelAdjust = 1.2; // Level adjustment for dry signal to match true bypass level
+        if (!bypass) { // Note: Originally did not bypass effect when true bypassed, but it produced a pop on start up
+			float dryLevelAdjust = 1.2; // Level adjustment for dry signal to match true bypass level
 
-    	float sendl, sendr, wetl, wetr;  // Reverb Inputs/Outputs
-        float reverb_out = 0.0;
-        float delay_out = 0.0;
+			float sendl, sendr, wetl, wetr;  // Reverb Inputs/Outputs
+			float reverb_out = 0.0;
+			float delay_out = 0.0;
 
-        float effectIn = leftIn;
-        if (holdMode) {
-        	effectIn = 0.0;
-        }
+			float effectIn = leftIn;
+			if (holdMode) {
+				effectIn = 0.0;
+			}
 
-        if (leftTogglePosition == 1) { // Parallel Delay/Reverb
-    	    sendl = sendr = effectIn;
-    	    verb.Process(sendl, sendr, &wetl, &wetr);
-    	    reverb_out = (wetl + wetr) / 2;
+			if (leftTogglePosition == 1) { // Parallel Delay/Reverb
+				sendl = sendr = effectIn;
+				verb.Process(sendl, sendr, &wetl, &wetr);
+				reverb_out = (wetl + wetr) / 2;
 
-            // Process Delay
-            delay_out = delay1.Process(effectIn);
+				// Process Delay
+				delay_out = delay1.Process(effectIn);
 
-        } else if (leftTogglePosition == 0) { //  Delay into Reverb
-            // Process Delay
-            delay_out = delay1.Process(effectIn) * delayMix;
+			} else if (leftTogglePosition == 0) { //  Delay into Reverb
+				// Process Delay
+				delay_out = delay1.Process(effectIn) * delayMix;
 
-    	    sendl = sendr = delay_out + effectIn;
-    	    verb.Process(sendl, sendr, &wetl, &wetr);
-    	    reverb_out = (wetl + wetr) / 2;
+				sendl = sendr = delay_out + effectIn;
+				verb.Process(sendl, sendr, &wetl, &wetr);
+				reverb_out = (wetl + wetr) / 2;
 
-        } else if (leftTogglePosition == 2) { //  Reverb into Delay
-    	    sendl = sendr = effectIn;
-    	    verb.Process(sendl, sendr, &wetl, &wetr);
-    	    reverb_out = (wetl + wetr) / 2;
+			} else if (leftTogglePosition == 2) { //  Reverb into Delay
+				sendl = sendr = effectIn;
+				verb.Process(sendl, sendr, &wetl, &wetr);
+				reverb_out = (wetl + wetr) / 2;
 
-            // Process Delay
-            delay_out = delay1.Process(reverb_out * reverbMix + effectIn); // TODO should leftIn be included here? see what sounds better
-        }
+				// Process Delay
+				delay_out = delay1.Process(reverb_out * reverbMix + effectIn); // TODO should leftIn be included here? see what sounds better
+			}
 
 
-        if (leftTogglePosition == 1) { // Parallel Delay/Reverb
-            leftOut = leftIn * dryLevelAdjust + reverbMix * reverb_out + delayMix * delay_out;
-        } else if (leftTogglePosition == 0) { //  Delay into Reverb
-            leftOut = leftIn * dryLevelAdjust + reverbMix * reverb_out;
-        } else if (leftTogglePosition == 2) { //  Reverb into Delay
-            leftOut = leftIn * dryLevelAdjust + delayMix * delay_out;
+			if (leftTogglePosition == 1) { // Parallel Delay/Reverb
+				leftOut = leftIn * dryLevelAdjust + reverbMix * reverb_out + delayMix * delay_out;
+			} else if (leftTogglePosition == 0) { //  Delay into Reverb
+				leftOut = leftIn * dryLevelAdjust + reverbMix * reverb_out;
+			} else if (leftTogglePosition == 2) { //  Reverb into Delay
+				leftOut = leftIn * dryLevelAdjust + delayMix * delay_out;
+			}
         }
 
         /////////////////////////////////////////////////////////////////////////
@@ -498,8 +503,8 @@ int main(void)
   delay1.delayTarget = 24000; // in samples
   delay1.feedback = 0.0;
   delay1.active = true;
-  //delay1.toneOctLP.Init(SAMPLING_FREQUENCY_HZ);
-  //delay1.toneOctLP.SetFreq(20000.0);
+  delay1.toneOctLP.Init(SAMPLING_FREQUENCY_HZ);
+  delay1.toneOctLP.SetFreq(1000.0);
 
   previousDelayTimeKnob = 0.1;
   previousDelayTimeExp = 0.0;
@@ -785,16 +790,19 @@ int main(void)
     	rightTogglePosition = 0;
         delay1.reverseMode = false;
         delay1.del->setOctave(false);
+        delay1.octMode = false;
 
     } else if (right_toggle_down == 0) {
     	rightTogglePosition = 2;
         delay1.reverseMode = true;
         delay1.del->setOctave(false);
+        delay1.octMode = false;
 
     } else {
     	rightTogglePosition = 1;
         delay1.reverseMode = false;
         delay1.del->setOctave(true);
+        delay1.octMode = true;
 
     }
 
