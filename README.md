@@ -63,6 +63,31 @@ The effect in the main branch is an example delay/reverb using [DaisySP](https:/
 Connecting the pedal with ST-Link v3:
 ![app](https://github.com/GuitarML/GuitarPedalSTM32/blob/main/images/stlink_pic.jpg)
 
+### Default Reverb/Delay
+
+The example effect in the main branch is a Reverb/Delay using DaisySP. 
+Controls:
+Knob1: Reverb Mix
+Knob2: Reverb Time
+Knob3: Reverb Filter (Damping)
+Knob4: Delay Mix
+Knob5: Delay Time
+Knob6: Delay Feedback
+
+Left Toggle is Routing
+Up: Delay into Reverb
+Center: Parallel Reverb/Delay
+Down: Reverb into Delay
+
+Right Toggle is Delay Mode
+Up: Normal Forward Delay
+Center: Octave Delay
+Down: Reverse Delay
+
+Right Footswitch is Bypass (pedal boots up in true bypass)
+Left Footswitch is Hold/Freeze (Holds reverb/delay feedback, no new signal to effects)
+
+Expression is an alternate control for Delay Time
 
 ### Importing the Project
 
