@@ -99,6 +99,8 @@ volatile float reverbMix						        __attribute__ ((section(".audiobuffer")));
 volatile float verbTime					       	__attribute__ ((section(".audiobuffer")));
 volatile float verbFreq					        __attribute__ ((section(".audiobuffer")));
 
+volatile float previousDelayTimeKnob					        __attribute__ ((section(".audiobuffer")));
+volatile float previousDelayTimeExp					        __attribute__ ((section(".audiobuffer")));
 
 // Expression
 bool expressionControl = false;
@@ -118,6 +120,10 @@ uint32_t aux_threshold = 100;
 uint32_t aux_wait_timer = 100;
 bool aux = false;
 uint8_t aux_reset = 0;
+bool holdMode = false;
+
+float preHoldReverbFeedback = 0.0;
+float preHoldDelayFeedback = 0.0;
 
 // Toggle switches
 int leftTogglePosition = 0; // 0=up, 1=middle. 2=down
@@ -173,8 +179,8 @@ struct delayRevOct {
     float feedback = 0.0;
     float active = false;
     bool reverseMode = false;
-    //Tone toneOctLP;            // Low Pass
-    float level = 1.0;         // Level multiplier of output, added for stereo modulation
+    //Tone toneOctLP;            // Low Pass Filter removed for now
+    float level = 1.0;         // Level multiplier of output, added for stereo modulation (unused here)
     float level_reverse = 1.0; // Level multiplier of output, added for stereo modulation
     bool dual_delay = false;
     bool secondTapOn = false;
@@ -183,7 +189,7 @@ struct delayRevOct {
         // set delay times
         fonepole(currentDelay, delayTarget, .0002f);
         del->SetDelay(currentDelay);
-        delreverse->SetDelay1(currentDelay * 2);  // TODO IS it right to multiply by 2x?
+        delreverse->SetDelay1(currentDelay * 2);
 
         float del_read = signedINT16_to_float(del->Read());
 
@@ -212,8 +218,6 @@ struct delayRevOct {
             delreverse->Write(float_to_signedINT16(feedback * read));
             // delreverse->Write((feedback * read2));
         }
-
-        // TODO Figure out how to do dotted eighth with reverse
 
         if (dual_delay) {
             return read_reverse * level_reverse * 0.5 + (read + secondTap) * level * 0.5; // Half the volume to keep total level consistent
@@ -307,34 +311,37 @@ void Process_HalfBuffer() {
         float reverb_out = 0.0;
         float delay_out = 0.0;
 
+        float effectIn = leftIn;
+        if (holdMode) {
+        	effectIn = 0.0;
+        }
+
         if (leftTogglePosition == 1) { // Parallel Delay/Reverb
-    	    sendl = sendr = leftIn;
+    	    sendl = sendr = effectIn;
     	    verb.Process(sendl, sendr, &wetl, &wetr);
     	    reverb_out = (wetl + wetr) / 2;
 
             // Process Delay
-            delay_out = delay1.Process(leftIn);
+            delay_out = delay1.Process(effectIn);
 
         } else if (leftTogglePosition == 0) { //  Delay into Reverb
             // Process Delay
-            delay_out = delay1.Process(leftIn) * delayMix;
+            delay_out = delay1.Process(effectIn) * delayMix;
 
-    	    sendl = sendr = delay_out + leftIn;
+    	    sendl = sendr = delay_out + effectIn;
     	    verb.Process(sendl, sendr, &wetl, &wetr);
     	    reverb_out = (wetl + wetr) / 2;
 
         } else if (leftTogglePosition == 2) { //  Reverb into Delay
-    	    sendl = sendr = leftIn;
+    	    sendl = sendr = effectIn;
     	    verb.Process(sendl, sendr, &wetl, &wetr);
     	    reverb_out = (wetl + wetr) / 2;
 
             // Process Delay
-            delay_out = delay1.Process(reverb_out * reverbMix + leftIn); // TODO should leftIn be included here? see what sounds better
+            delay_out = delay1.Process(reverb_out * reverbMix + effectIn); // TODO should leftIn be included here? see what sounds better
         }
 
 
-
-        //leftOut = leftIn * (1.0 - Mix) + wetl * Mix;
         if (leftTogglePosition == 1) { // Parallel Delay/Reverb
             leftOut = leftIn * dryLevelAdjust + reverbMix * reverb_out + delayMix * delay_out;
         } else if (leftTogglePosition == 0) { //  Delay into Reverb
@@ -473,7 +480,17 @@ int main(void)
   controlSetting[5] = 0.5f;
   controlSetting[6] = 0.5f;
 
+  prevControlSetting[0] = 0.0f;
+  prevControlSetting[1] = 0.0f;
+  prevControlSetting[2] = 0.0f;
+  prevControlSetting[3] = 0.0f;
+  prevControlSetting[4] = 0.0f;
+  prevControlSetting[5] = 0.0f;
+  prevControlSetting[6] = 0.0f;
 
+
+
+  // Effects
   delayLine.Init();
   delayLineRev.Init();
   delay1.del = &delayLine;
@@ -484,8 +501,9 @@ int main(void)
   //delay1.toneOctLP.Init(SAMPLING_FREQUENCY_HZ);
   //delay1.toneOctLP.SetFreq(20000.0);
 
+  previousDelayTimeKnob = 0.1;
+  previousDelayTimeExp = 0.0;
 
-  // Effects
   verb.Init(SAMPLING_FREQUENCY_HZ);
 
   HAL_StatusTypeDef halStatus;
@@ -567,7 +585,7 @@ int main(void)
                     	verbTime = controlSetting[1];
                         time_temp = (float) verbTime;
                     	verb.SetFeedback(time_temp);
-
+                    	preHoldReverbFeedback = time_temp;
 						break;
                     }
 
@@ -585,8 +603,19 @@ int main(void)
                     }
 
 					case 4: {
-						float delayTime = controlSetting[4];
-						delay1.delayTarget = delayTime * 96000;
+
+                        // If the Knob4 ADC reading has changed, and currently under expression control +/- 0.005 then give control to Knob2
+                        if ((controlSetting[4] > previousDelayTimeKnob + 0.003 || controlSetting[4] < previousDelayTimeKnob - 0.003) && expressionControl == true) {
+                            expressionControl = false;
+                        }
+
+                        if (!expressionControl) {
+    						float delayTime = controlSetting[4];
+    						previousDelayTimeKnob = delayTime;
+    						delay1.delayTarget = delayTime * 48000;
+
+                        }
+
 
 						break;
 					}
@@ -602,7 +631,17 @@ int main(void)
 					}
 
 					case 6: {  // EXPRESSION INPUT
+                        // If the expression ADC reading has changed +/- 0.005 and currently under Knob2 control, then give control to expression
+                        if ((controlSetting[6] > previousDelayTimeExp + 0.003 || controlSetting[6] < previousDelayTimeExp - 0.003) && expressionControl == false) {
+                            expressionControl = true;
+                        }
 
+                        if (expressionControl) {
+    						float delayTime = controlSetting[6];
+    						previousDelayTimeExp = delayTime;
+    						delay1.delayTarget = delayTime * 48000;
+
+                        }
 
 						break;
                     }
@@ -650,7 +689,7 @@ int main(void)
     quiet_bypass_wait_timer = 0;
 
     bypass_reset = 0;
-	  bypass_wait_timer = 0; // Start bypass wait timer for debouce
+	bypass_wait_timer = 0; // Start bypass wait timer for debouce
     bypass = (bypass == false) ? true : false;
 
     if (bypass) {
@@ -690,7 +729,12 @@ int main(void)
         aux = true;
         aux_reset = 0;
         HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_SET); // Turn on left led
-        HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET); // Mute audio (testing mute)
+        //HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_SET); // Mute audio (testing mute)
+        holdMode = true;
+        preHoldDelayFeedback = delay1.feedback;
+
+    	verb.SetFeedback(1.0);
+    	delay1.feedback = 1.0;
       }
 
         // Initial check for once aux is let go
@@ -701,10 +745,13 @@ int main(void)
 
         // Once debounce is complete and aux footswitch is let go, turn off Aux
 	  if (aux_footswitch == GPIO_PIN_SET && aux_wait_timer == aux_threshold && aux == true && aux_reset == 1) {
-      aux = false;
-      aux_reset = 0; 
-      HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET); // Turn off left led
-      HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET); // Unmute audio (testing mute)
+        aux = false;
+        aux_reset = 0;
+        HAL_GPIO_WritePin(GPIOA, GPIO_PIN_9, GPIO_PIN_RESET); // Turn off left led
+        holdMode = false;
+        verb.SetFeedback(preHoldReverbFeedback);
+        delay1.feedback = preHoldDelayFeedback;
+        //HAL_GPIO_WritePin(GPIOD, GPIO_PIN_2, GPIO_PIN_RESET); // Unmute audio (testing mute)
 	  }
 
     ////////////////////////////////////////////////////////////////////////////////////////////////

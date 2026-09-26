@@ -126,3 +126,5 @@ as his related open source repositories on [Github](https://github.com/pms67). T
 in the guitar pedal shown in many of the Phil's Lab videos. 
 
 The reverbsc_in16 included here is a modified version of the [DaisySp](https://github.com/daisyaudio/DaisySP) reverbsc that uses int16 instead of floats in the audio buffer. This halves the amount of RAM used for the reverb.
+
+The reverse delay effect by Adam Fulford, used in util/delayline_reverse.h.
