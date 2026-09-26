@@ -65,29 +65,29 @@ Connecting the pedal with ST-Link v3:
 
 ### Default Reverb/Delay
 
-The example effect in the main branch is a Reverb/Delay using DaisySP. 
-Controls:
-Knob1: Reverb Mix
-Knob2: Reverb Time
-Knob3: Reverb Filter (Damping)
-Knob4: Delay Mix
-Knob5: Delay Time
-Knob6: Delay Feedback
-
-Left Toggle is Routing
-Up: Delay into Reverb
-Center: Parallel Reverb/Delay
-Down: Reverb into Delay
-
-Right Toggle is Delay Mode
-Up: Normal Forward Delay
-Center: Octave Delay
-Down: Reverse Delay
-
-Right Footswitch is Bypass (pedal boots up in true bypass)
-Left Footswitch is Hold/Freeze (Holds reverb/delay feedback, no new signal to effects)
-
-Expression is an alternate control for Delay Time
+The example effect in the main branch is a Reverb/Delay using DaisySP.<br>
+Controls:<br>
+Knob1: Reverb Mix<br>
+Knob2: Reverb Time<br>
+Knob3: Reverb Filter (Damping)<br>
+Knob4: Delay Mix<br>
+Knob5: Delay Time<br>
+Knob6: Delay Feedback<br>
+<br>
+Left Toggle is Routing<br>
+Up: Delay into Reverb<br>
+Center: Parallel Reverb/Delay<br>
+Down: Reverb into Delay<br>
+<br>
+Right Toggle is Delay Mode<br>
+Up: Normal Forward Delay<br>
+Center: Octave Delay<br>
+Down: Reverse Delay<br>
+<br>
+Right Footswitch is Bypass (pedal boots up in true bypass)<br>
+Left Footswitch is Hold/Freeze (Holds reverb/delay feedback, no new signal to effects)<br>
+<br>
+Expression is an alternate control for Delay Time<br>
 
 ### Importing the Project
 
