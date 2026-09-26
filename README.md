@@ -47,12 +47,12 @@ NOTE: The power jack is intended to protrude from the pcb edge, fitting slightly
 
 
 Tayda Drill Templates:
-[Two Footswitch, Two Single Color LED version]()
-[Single Footswitch and RGB LED version]()
+[Two Footswitch, Two Single Color LED version](https://drill.taydakits.com/box-designs/new?public_key=b01XQ0p6RWl1NG9iTHYyMGtvVk8vdz09Cg==)
+[Single Footswitch and RGB LED version](https://drill.taydakits.com/box-designs/new?public_key=N3oxTGpmM2x5Wk02WEdpMzExU3U5UT09Cg==)
 
 NOTE: If you want to use the Single Footswitch/RGB LED version, you will need to change the peripheral settings. One of the footswitches changes from a GPIO input to a GPIO output (use pcb layout and schematic for guidance). Alternatively, you can change the LED pins from on/off GPIO outputs to Timer based PWM for brightness control. 
 
-
+PCB from JLCpcb:
 ![app](https://github.com/GuitarML/GuitarPedalSTM32/blob/main/images/pcb_pic.jpg)
 
 
@@ -118,11 +118,11 @@ It was important to me that this design was a single board, with one sided assem
 
 When I ordered two assembled boards (with 3 blank pcbs due to minimum 5 at JLCpcb), the total price with shipping to USA was $250, with $90 of that being shipping/tariffs. The base price was around $160, which I think is reasonable. As the quantity goes up, the price per board decreases. This is due to the additional $3 per unique "Extended" part (as opposed to "Basic" parts) in the JLCpcb parts library. The $3 is a one time charge per unique Extended part in the BOM no matter how many pcbs you order. This fee is for manually loading the reels into the pick and place machine. The resistors/capacitors with standard values are "Basic", while pretty much everything else in this design is "Extended". 
 
-My personal preference as a guitarist: Stereo and Midi are cool, but as a guitar player with a single amp, I typically don't use these features that seem to be the standard for modern digital pedals these days. Removing these options also frees up my creative bandwidth to focus on the DSP, which is my main interest. Still, it would be fairly easy to modify my design and add a second audio path for stereo, or a midi circuit on the UART peripheral. For references, see the [SoundSketch](https://github.com/GuitarML/SoundSketch) pedal, which has these features using a Daisy Seed.
-
 
 ## Acknowledgements
 
 The pcb design and code rely heavily on what I learned from [Phil's Lab](https://www.youtube.com/@PhilsLab) YouTube channel, as well
 as his related open source repositories on [Github](https://github.com/pms67). The final MCU/codec combination I use here is the same used
 in the guitar pedal shown in many of the Phil's Lab videos. 
+
+The reverbsc_in16 included here is a modified version of the [DaisySp](https://github.com/daisyaudio/DaisySP) reverbsc that uses int16 instead of floats in the audio buffer. This halves the amount of RAM used for the reverb.
