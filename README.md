@@ -4,6 +4,8 @@ This is a custom STM32 digital guitar pedal with firmware programmed in c++ usin
 running at 280MHz with 1.4MB SRAM and 128kb of flash. The PCB is designed using KiCad, and the JLCpcb Gerbers are included for easy ordering. This
 pedal is capable of reverbs, delays, granular, filtering, amp and cabsims, and anything else you can think up.
 
+[YouTube Walkthrough](https://www.youtube.com/watch?v=E03dCQ4MTPk)
+
 ![app](https://github.com/GuitarML/GuitarPedalSTM32/blob/main/images/pedal_pic.jpg)
 
 Hardware Features:
@@ -42,6 +44,8 @@ Typical build process:
 IMPORTANT: When ordering the pcb using the included Gerbers, you will need to change the orientation of certain parts (most of the ICs) using the visualization tool (during JLCPcb's ordering process). This is because the part data from Kicad exported to the .pos file are different from what JLCpcb expects. Compare part orientation from their online tool to the Kicad PCB layout. Double check all ICs, relays, transistors, LDOs, and diodes.
 
 IMPORTANT: The control layout spacing for the potentiometers and toggles is very tight. The toggle switch base must be insulated from the neighboring potentiometer legs or it could create a short. I typically wrap the base of the toggles in electrical tape twice to ensure proper insulation. 
+
+IMPORTANT: The potentiometers require dust covers such as [these](https://www.taydaelectronics.com/dust-seal-covers-for-potentiometer.html) to avoid shorting out connections on the backside of the pcb.
 
 NOTE: The power jack is intended to protrude from the pcb edge, fitting slightly into the rectangle cutout in the enclosure. May take some adjustment once potentiometers are soldered, recommended to adjust prior to soldering potentiometers/toggles, using the three 1/4" jack mounts to hold in place. 
 
